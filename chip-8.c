@@ -5,8 +5,27 @@
 
 #define MEMSIZ 4096
 
+unsigned char fontset[80]={
+    0xF0, 0x90, 0x90, 0x90, 0xF0, //0
+    0x20, 0x60, 0x20, 0x20, 0x70, //1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0 //2
+    //3
+    //4
+    //5
+    //6
+    //7
+    //8
+    //9
+    //A
+    //B
+    //C
+    //D
+    //E
+    //F
+};
+
 //Defino estructura del chip-8
-struct machine_t {
+typedef struct machine_t {
 	uint8_t mem[MEMSIZ];	// Memoria del chip-8 de tamaño MEMSIZ
 	uint16_t pc;			// Program Counter
 
@@ -16,7 +35,9 @@ struct machine_t {
 	uint8_t V[16];
 	uint16_t i;
 	uint8_t dt, st;
-};
+
+        char screen[32*64];
+} Machine;
 
 //Función para inicializar máquina a 0
 void init_machine(struct machine_t* machine){
@@ -71,8 +92,8 @@ int main(int argc, char** argv){
 		SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
 		SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
-													SDL_TEXTUREACCESS_STREAMING,
-													64, 32);
+						        SDL_TEXTUREACCESS_STREAMING,
+						      	64, 32);
 
 		int pitch;
 		Uint32* pixels;
@@ -106,7 +127,7 @@ int main(int argc, char** argv){
 
 
 int decode(){
-	struct machine_t mac;
+	Machine mac;
 	init_machine(&mac);
 	load_rom(&mac);
 
