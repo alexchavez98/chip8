@@ -1,27 +1,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
+#include <time.h>
 #include <SDL2/SDL.h>
 
-#define MEMSIZ 4096
+#define MEMSIZ        4096
+#define CHIP8_WIDTH   64
+#define CHIP8_HEIGHT  32
+#define WINDOW_WIDTH  CHIP8_WIDTH*10
+#define WINDOW_HEIGHT CHIP8_HEIGHT*10
 
 unsigned char fontset[80]={
     0xF0, 0x90, 0x90, 0x90, 0xF0, //0
     0x20, 0x60, 0x20, 0x20, 0x70, //1
-    0xF0, 0x10, 0xF0, 0x80, 0xF0 //2
-    //3
-    //4
-    //5
-    //6
-    //7
-    //8
-    //9
-    //A
-    //B
-    //C
-    //D
-    //E
-    //F
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, //2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, //3
+    0x90, 0x90, 0xF0, 0x10, 0x10, //4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, //5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, //6
+    0xF0, 0x10, 0x20, 0x40, 0x40, //7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, //8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, //9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, //A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, //B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, //C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, //D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, //E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  //F
 };
 
 //Defino estructura del chip-8
@@ -36,11 +42,22 @@ typedef struct machine_t {
 	uint16_t i;
 	uint8_t dt, st;
 
-        char screen[32*64];
-} Machine;
+    char screen[CHIP8_WIDTH*CHIP8_HEIGHT];
+} Chip8;
+
+static void expansion(char* from, Uint32* to){
+	for(int i=0; i<2048; i++){
+		to[i] = (from[i]) ? -1 : 0;
+	}
+}
+
+void init_machine(Chip8* machine);
+void load_rom(Chip8* machine);
+int decode();
+void draw(Chip8* cpu);
 
 //Función para inicializar máquina a 0
-void init_machine(struct machine_t* machine){
+void init_machine(Chip8* machine){
 	machine->sp = machine->i = machine->dt = machine->st = 0x00;
 
 	machine->pc = 0x200;
@@ -52,10 +69,17 @@ void init_machine(struct machine_t* machine){
 		machine->stack[i] = 0x00;
 		machine->V[i] = 0x00;
 	}
+        for(int i = 0; i < 80; i++){
+          machine-> mem[i] = fontset[i];
+        }
+
+    for(int i = 0; i < 2048; i++){
+          machine-> screen[i] = 0;
+        }
 }
 
 // Lectura de ROMs
-void load_rom(struct machine_t* machine){
+void load_rom(Chip8* machine){
 	FILE* fp = fopen("PONG", "r");
 
 	if(fp==NULL){
@@ -76,39 +100,78 @@ void clean(){
 	SDL_Quit();
 }
 
+int lastTicks;
+
 int main(int argc, char** argv){
 
+	SDL_Window* window;
+	SDL_Renderer* renderer;
+	SDL_Texture* texture;
+	SDL_Surface* surface;
+
+
+	//CHIP8 configuration
+	Chip8 chip8;
+	init_machine(&chip8);
+	load_rom(&chip8);
+	srand(time(NULL));
+
+
+	//for(int i=0; i<2048; i++){
+	//	chip8.screen[i] =(rand() & 1);
+	//}
+	int lastTicks = SDL_GetTicks();
+
+	//SDL Configuration
 	SDL_Init(SDL_INIT_EVERYTHING);
 
-	SDL_Window* window = SDL_CreateWindow(	"CHIP-8",
+	window = SDL_CreateWindow(	"CHIP-8",
 											SDL_WINDOWPOS_CENTERED,
 											SDL_WINDOWPOS_CENTERED,
-											640,
-											320,
+											WINDOW_WIDTH,
+											WINDOW_HEIGHT,
 											SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL);
 	if(window==NULL){
 		printf("Error: La ventana no pudo ser creada");
 	} else {
-		SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-		SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+		texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 						        SDL_TEXTUREACCESS_STREAMING,
-						      	64, 32);
+						      	CHIP8_WIDTH, CHIP8_HEIGHT);
+
+		surface = SDL_CreateRGBSurface(0, 64, 32, 32,
+			0x00FF0000,
+			0x0000FF00,
+			0x000000FF,
+			0xFF000000);
 
 		int pitch;
 		Uint32* pixels;
-		SDL_LockTexture(texture, NULL, (void**) &pixels, &pitch);
+		//SDL_LockTexture(texture, NULL, &surface->pixels, &surface->pitch);
 		// memset
-		memset(pixels, 0x80, 32 * pitch);
+		printf("%d", surface->pitch);
+		//memset(pixels, 0x80, 32 * pitch);
 
-		SDL_UnlockTexture(texture);
+		//expansion(chip8.screen, (Uint32*) surface->pixels);
+
+		//SDL_UnlockTexture(texture);
 
 		int isRunning=1;
+
+        
 
 		while(isRunning){
 			SDL_RenderClear(renderer);
 			SDL_RenderCopy(renderer, texture, NULL, NULL);
 			SDL_RenderPresent(renderer);
+
+			if(chip8.dt>0)
+				chip8.dt-=1;
+			if(chip8.st>0)
+				chip8.dt-=1;
+
+			decode(&chip8);
 
 			SDL_Event e;
 			while(SDL_PollEvent(&e)){
@@ -116,6 +179,21 @@ int main(int argc, char** argv){
 					isRunning = 0;
 				}
 			}
+
+			SDL_LockTexture(texture, NULL, &surface->pixels, &surface->pitch);
+			// memset
+			printf("%d", surface->pitch);
+			//memset(pixels, 0x80, 32 * pitch);
+
+			expansion(chip8.screen, (Uint32*) surface->pixels);
+
+			SDL_UnlockTexture(texture);
+
+			if(SDL_GetTicks() < lastTicks + 1000/2.0){
+				SDL_Delay(-SDL_GetTicks()+lastTicks+1000/2.0);
+				//isRunning = 0;
+			}
+			lastTicks = SDL_GetTicks();
 		}
 	}
 
@@ -126,19 +204,17 @@ int main(int argc, char** argv){
 }
 
 
-int decode(){
-	Machine mac;
-	init_machine(&mac);
-	load_rom(&mac);
+int decode(Chip8* cpu){
 
 	int mustQuit=0;
 
-	while(!mustQuit){
+	//while(!mustQuit){
+		mustQuit =1;
 		// Leer el opcode
-		uint16_t opcode = (mac.mem[mac.pc]<<8) | mac.mem[mac.pc + 1];
+		uint16_t opcode = (cpu->mem[cpu->pc]<<8) | cpu->mem[cpu->pc + 1];
 
-		if((mac.pc+=2) == MEMSIZ){
-			mac.pc = 0x200;
+		if((cpu->pc+=2) == MEMSIZ){
+			cpu->pc = 0x200;
 			mustQuit = 1;
 		}
 
@@ -154,106 +230,112 @@ int decode(){
 				if(opcode==0x00E0){
 					// TODO: CLS
 					printf("CLS\n");
+                    memset(cpu->screen, 0, sizeof(cpu->screen));
+                                        
 				} else if (opcode==0x00EE){
 					// TODO: RET
 					printf("RET\n");
+					cpu->sp =(cpu->sp-1) & 0xFFFF;
+					cpu->pc = cpu->stack[cpu->sp];
 				}
 				break;
 			case 1:
 				// TODO: JP
 				printf("JP %x\n", nnn);
-				mac.pc = nnn;
+				cpu->pc = nnn;
 				break;
 			case 2:
 				// TODO: CALL
 				printf("CALL %x\n", nnn);
+				cpu->sp = (cpu->sp+1) & 0xFFFF;
+				cpu->pc = nnn;
 				break;
 			case 3:
 				// TODO: SE
 				printf("SE %x %x\n", x, kk);
-				if(mac.V[x]==kk){
-					mac.pc = (mac.pc + 2) & 0xFFF;
+				if(cpu->V[x]==kk){
+					cpu->pc = (cpu->pc + 2) & 0xFFF;
 				}
 				break;
 			case 4:
 				//TODO: SNE
 				printf("SNE %x %x\n", x, kk);
-				if(mac.V[x]==kk){
-					mac.pc = (mac.pc + 2) & 0xFFF;
+				if(cpu->V[x]==kk){
+					cpu->pc = (cpu->pc + 2) & 0xFFF;
 				}
 				break;
 			case 5:
-				//printf("SE %x %x\n", x, y);
-				if(mac.V[x]==mac.V[y]){
-					mac.pc = (mac.pc + 2) & 0xFFF;
+				printf("SE %x %x\n", x, y);
+				if(cpu->V[x]==cpu->V[y]){
+					cpu->pc = (cpu->pc + 2) & 0xFFF;
 				}
 				break;
 			case 6:
-				//printf("LD %x %x\n", x, kk);
-				mac.V[x] = kk;
+				printf("LD V[%x] %x\n", x, kk);
+				cpu->V[x] = kk;
 				break;
 			case 7:
-				//printf("ADD %x %x\n", x, kk);
-				mac.V[x] = (mac.V[x] + kk) & 0xFF;
+				printf("ADD %x %x\n", x, kk);
+				cpu->V[x] = (cpu->V[x] + kk) & 0xFF;
 				break;
 			case 8:
 				switch(n){
 					case 0:
-						//printf("LD %x %x\n", x, y);
-						mac.V[x] = mac.V[y];
+						printf("LD V%x V%x\n", x, y);
+						cpu->V[x] = cpu->V[y];
 						break;
 					case 1:
-						//printf("OR %x %x\n", x, y);
-						mac.V[x] |= mac.V[y];
+						printf("OR %x %x\n", x, y);
+						cpu->V[x] |= cpu->V[y];
 						break;
 					case 2:
-						//printf("AND %x %x\n", x, y);
-						mac.V[x] &= mac.V[y];
+						printf("AND %x %x\n", x, y);
+						cpu->V[x] &= cpu->V[y];
 						break;
 					case 3:
-						//printf("XOR %x %x\n", x, y);
-						mac.V[x] ^= mac.V[y];
+						printf("XOR %x %x\n", x, y);
+						cpu->V[x] ^= cpu->V[y];
 						break;
 					case 4:
-						//printf("ADD %x %x\n", x, y);
-						mac.V[0xF] = (mac.V[x] > mac.V[x] + mac.V[y]);
-						mac.V[x] = (mac.V[x] + mac.V[y]) & 0xFF;
+						printf("ADD %x %x\n", x, y);
+						cpu->V[0xF] = (cpu->V[x] > cpu->V[x] + cpu->V[y]);
+						cpu->V[x] = (cpu->V[x] + cpu->V[y]) & 0xFF;
 						break;
 					case 5:
-						//printf("SUB %x %x\n", x, y);
-						mac.V[0xF] = (mac.V[x] > mac.V[y]);
-						mac.V[x] = (mac.V[x] - mac.V[y]) & 0xFF;
+						printf("SUB %x %x\n", x, y);
+						cpu->V[0xF] = (cpu->V[x] > cpu->V[y]);
+						cpu->V[x] = (cpu->V[x] - cpu->V[y]) & 0xFF;
 						break;
 					case 6:
 						printf("SHR %x %x\n", x, y);
-						mac.V[0xF] = (mac.V[x] & 0x01);
-						mac.V[x] = mac.V[x] >> 1;
+						cpu->V[0xF] = (cpu->V[x] & 0x01);
+						cpu->V[x] = cpu->V[x] >> 1;
 						break;
 					case 7:
 						printf("SUBN %x %x\n", x, y);
-						mac.V[0xF] = (mac.V[x] < mac.V[y]);
-						mac.V[x] = (mac.V[y] - mac.V[x]) & 0xFF;
+						cpu->V[0xF] = (cpu->V[x] < cpu->V[y]);
+						cpu->V[x] = (cpu->V[y] - cpu->V[x]) & 0xFF;
 						break;
 					case 0xE:
 						printf("SHL %x %x\n", x, y);
-						mac.V[0xF] = (mac.V[x] & 0x80) != 0;
-						mac.V[x] = (mac.V[x] << 1) & 0xFF;
+						cpu->V[0xF] = (cpu->V[x] & 0x80) != 0;
+						cpu->V[x] = (cpu->V[x] << 1) & 0xFF;
 						break;
 				}
 				break;
 			case 9:
 				printf("SNE %x %x\n", x, y);
-				if(mac.V[x]!=mac.V[y]){
-					mac.pc = (mac.pc+2) & 0xFFF;
+				if(cpu->V[x]!=cpu->V[y]){
+					cpu->pc = (cpu->pc+2) & 0xFFF;
 				}
 				break;
 			case 0xA:
 				printf("LD %x\n", nnn);
-				mac.i = nnn;
+				cpu->i = nnn & 0xFFF;
 				break;
 			case 0xB:
 				printf("JP %x\n", nnn);
-				mac.pc = nnn + mac.V[0];
+				cpu->pc = (nnn + cpu->V[0]) & 0xFFF;
 				break;
 			case 0xC:
 				printf("RND %x %x\n", x, kk);
@@ -261,6 +343,16 @@ int decode(){
 				break;
 			case 0xD:
 				printf("DRW %x %x %x\n", x, y, n);
+				for(int j=0; j<n; j++){
+					uint8_t sprite = cpu->mem[cpu->i];
+					for(int i=0;i<7;i++){
+						int px = (cpu->V[x] + i) & 63;
+						int py = (cpu->V[y] + j) & 31;
+						cpu->screen[py*64 + px] = (sprite & (1<<(7-i)))!=0;
+						
+					}
+				}
+				printf("%x\n",cpu->V[0xA]);
 				break;
 			case 0xE:
 				if(kk==0x9E){
@@ -273,50 +365,61 @@ int decode(){
 				switch(kk){
 					case 0x07:
 						printf("LD %x, DT\n", x);
-						mac.V[x] = mac.dt;
+						cpu->V[x] = cpu->dt;
 						break;
 					case 0x0A:
 						printf("LD %x, K\n", x);
-
+						//cpu->i = cpu->V[x];
 						break;
 					case 0x15:
 						printf("LD DT, %x\n", x);
-						mac.dt = mac.V[x];
+						cpu->dt = cpu->V[x];
 						break;
 					case 0x18:
 						printf("LD ST, %x\n", x);
-						mac.st = mac.V[x];
+						cpu->st = cpu->V[x];
 						break;
 					case 0x1E:
 						printf("ADD I, %x\n", x);
-						mac.i = mac.i + mac.V[x];
+						cpu->i = cpu->i + cpu->V[x];
 						break;
 					case 0x29:
 						printf("LD F, %x\n", x);
-
+						cpu->i=cpu->V[x]*0x5;
 						break;
 					case 0x33:
 						printf("LD B, %x\n", x);
+						cpu->mem[cpu->i] = cpu->V[x]/100;
+						cpu->mem[cpu->i+1] = cpu->V[x]/10;
+						cpu->mem[cpu->i+2] =cpu->V[x] %10;
 						break;
 					case 0x55:
 						printf("LD [I] %x\n", x);
-
+						for(int i = 0; i<x;i++){
+							cpu->mem[cpu->i+i] = cpu->V[i];
+						}
 						break;
 					case 0x65:
 						printf("LD %x, [I]\n", x);
+						for(int i = 0; i<x;i++){
+							cpu->V[i] = cpu->mem[cpu->i+i];
+						}
 						break;
 				}
 				break;
 		}
 
-		for(int i=0; i<16; i++)
-			printf("El registro V%d vale %x\n", i,mac.V[1]);
-	}
+		//for(int i=0; i<16; i++)
+		//	printf("El registro V%d vale %x\n", i,cpu.V[1]);
+	//}
 
 
-	//printf("%x", mac.mem[0x200]);
+	//printf("%x", cpu.mem[0x200]);
 
-	printf("¡Hola mundo!\n");
 	return 0;
+}
+
+void draw(Chip8* cpu){
+  //SDL_RenderClear(renderer);
 }
 
