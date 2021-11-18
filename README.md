@@ -7,5 +7,17 @@ Emulador de CHIP8 en C (todavía en proceso)
 - Input
 - Sonido
 
+### Compilación
+Es necesaria la librería SDL2
+
+```
+gcc -lSDL2 chip-8.c -o ./chip8
+```
+
+
 ### Ejecución
-Lo típico, poner ./chip8 desde el terminal. Por ahora solo ejecuta la ROM de PONG, que tendrá que estar en el mismo directorio
+Ejecutar desde terminal y añadir como parámetro el nombre del fichero.
+
+```
+./chip8 PONG
+```
