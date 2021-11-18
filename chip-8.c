@@ -5,11 +5,13 @@
 #include <time.h>
 #include <SDL2/SDL.h>
 
-#define MEMSIZ        4096
-#define CHIP8_WIDTH   64
-#define CHIP8_HEIGHT  32
-#define WINDOW_WIDTH  CHIP8_WIDTH*10
-#define WINDOW_HEIGHT CHIP8_HEIGHT*10
+#define MEMSIZ        	4096
+#define CHIP8_WIDTH   	64
+#define CHIP8_HEIGHT  	32
+#define WINDOW_WIDTH  	CHIP8_WIDTH*10
+#define WINDOW_HEIGHT 	CHIP8_HEIGHT*10
+#define FPS				60.0
+#define NUM_KEYS		16
 
 unsigned char fontset[80]={
     0xF0, 0x90, 0x90, 0x90, 0xF0, //0
@@ -30,6 +32,25 @@ unsigned char fontset[80]={
     0xF0, 0x80, 0xF0, 0x80, 0x80  //F
 };
 
+uint8_t keymap[NUM_KEYS] = {
+	SDLK_x,
+	SDLK_1,
+	SDLK_2,
+	SDLK_3,
+	SDLK_q,
+	SDLK_w,
+	SDLK_e,
+	SDLK_a,
+	SDLK_s,
+	SDLK_d,
+	SDLK_z,
+	SDLK_c,
+	SDLK_4,
+	SDLK_r,
+	SDLK_f,
+	SDLK_v
+};
+
 //Defino estructura del chip-8
 typedef struct machine_t {
 	uint8_t mem[MEMSIZ];	// Memoria del chip-8 de tamaño MEMSIZ
@@ -43,6 +64,7 @@ typedef struct machine_t {
 	uint8_t dt, st;
 
     char screen[CHIP8_WIDTH*CHIP8_HEIGHT];
+    uint8_t keyboard[NUM_KEYS];
 } Chip8;
 
 static void expansion(char* from, Uint32* to){
@@ -169,7 +191,7 @@ int main(int argc, char** argv){
 			if(chip8.dt>0)
 				chip8.dt-=1;
 			if(chip8.st>0)
-				chip8.dt-=1;
+				chip8.st-=1;
 
 			decode(&chip8);
 
@@ -189,8 +211,8 @@ int main(int argc, char** argv){
 
 			SDL_UnlockTexture(texture);
 
-			if(SDL_GetTicks() < lastTicks + 1000/2.0){
-				SDL_Delay(-SDL_GetTicks()+lastTicks+1000/2.0);
+			if(SDL_GetTicks() < lastTicks + 1000/FPS){
+				SDL_Delay(-SDL_GetTicks()+lastTicks+1000/FPS);
 				//isRunning = 0;
 			}
 			lastTicks = SDL_GetTicks();
@@ -247,7 +269,7 @@ int decode(Chip8* cpu){
 			case 2:
 				// TODO: CALL
 				printf("CALL %x\n", nnn);
-				cpu->sp = (cpu->sp+1) & 0xFFFF;
+				cpu->stack[cpu->sp++] = (cpu->pc);
 				cpu->pc = nnn;
 				break;
 			case 3:
@@ -339,26 +361,30 @@ int decode(Chip8* cpu){
 				break;
 			case 0xC:
 				printf("RND %x %x\n", x, kk);
-				
+				cpu->V[x] = (rand() & 0xFF) & kk;
 				break;
 			case 0xD:
 				printf("DRW %x %x %x\n", x, y, n);
 				for(int j=0; j<n; j++){
-					uint8_t sprite = cpu->mem[cpu->i];
+					uint8_t sprite = cpu->mem[cpu->i+j];
 					for(int i=0;i<7;i++){
 						int px = (cpu->V[x] + i) & 63;
 						int py = (cpu->V[y] + j) & 31;
 						cpu->screen[py*64 + px] = (sprite & (1<<(7-i)))!=0;
 						
 					}
+					printf("%x\n", sprite);
 				}
+				
 				printf("%x\n",cpu->V[0xA]);
 				break;
 			case 0xE:
 				if(kk==0x9E){
 					printf("SKP %x\n", x);
+
 				} else if(kk == 0xA1){
 					printf("SKNP %x\n", x);
+					cpu->pc+=2;
 				}
 				break;
 			case 0xF:
@@ -385,13 +411,13 @@ int decode(Chip8* cpu){
 						break;
 					case 0x29:
 						printf("LD F, %x\n", x);
-						cpu->i=cpu->V[x]*0x5;
+						cpu->i=(cpu->V[x]&0xF)*0x5;
 						break;
 					case 0x33:
 						printf("LD B, %x\n", x);
 						cpu->mem[cpu->i] = cpu->V[x]/100;
-						cpu->mem[cpu->i+1] = cpu->V[x]/10;
-						cpu->mem[cpu->i+2] =cpu->V[x] %10;
+						cpu->mem[cpu->i+1] = (cpu->V[x]/10)%10;
+						cpu->mem[cpu->i+2] =(cpu->V[x]%100) %10;
 						break;
 					case 0x55:
 						printf("LD [I] %x\n", x);
@@ -404,6 +430,7 @@ int decode(Chip8* cpu){
 						for(int i = 0; i<x;i++){
 							cpu->V[i] = cpu->mem[cpu->i+i];
 						}
+						cpu->i+=x+1;
 						break;
 				}
 				break;
