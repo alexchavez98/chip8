@@ -229,13 +229,14 @@ int main(int argc, char** argv){
 
 			
 
-			SDL_UnlockTexture(texture);
+			
 
 			if(SDL_GetTicks() < lastTicks + 1000/FPS){
-				SDL_LockTexture(texture, NULL, &surface->pixels, &surface->pitch);
+				
 				// memset
 				printf("%d", surface->pitch);
 				//memset(pixels, 0x80, 32 * pitch);
+				SDL_UnlockTexture(texture);
 
 				expansion(chip8.screen, (Uint32*) surface->pixels);
 				if(chip8.dt>0)
@@ -247,6 +248,7 @@ int main(int argc, char** argv){
 				SDL_RenderClear(renderer);
 				SDL_RenderCopy(renderer, texture, NULL, NULL);
 				SDL_RenderPresent(renderer);
+				SDL_LockTexture(texture, NULL, &surface->pixels, &surface->pitch);
 				if(SDLK_x){
 					printf("%d",SDLK_x);
 				}
