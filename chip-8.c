@@ -10,8 +10,10 @@
 #define CHIP8_HEIGHT  	32
 #define WINDOW_WIDTH  	CHIP8_WIDTH*10
 #define WINDOW_HEIGHT 	CHIP8_HEIGHT*10
-#define FPS				60.0
+#define FPS				500.0
 #define NUM_KEYS		16
+
+// Fonts
 
 unsigned char fontset[80]={
     0xF0, 0x90, 0x90, 0x90, 0xF0, //0
@@ -32,23 +34,25 @@ unsigned char fontset[80]={
     0xF0, 0x80, 0xF0, 0x80, 0x80  //F
 };
 
+// Keyboard
+
 uint8_t keymap[NUM_KEYS] = {
-	SDLK_x,
-	SDLK_1,
-	SDLK_2,
-	SDLK_3,
-	SDLK_q,
-	SDLK_w,
-	SDLK_e,
-	SDLK_a,
-	SDLK_s,
-	SDLK_d,
-	SDLK_z,
-	SDLK_c,
-	SDLK_4,
-	SDLK_r,
-	SDLK_f,
-	SDLK_v
+	SDL_SCANCODE_X,
+	SDL_SCANCODE_1,
+	SDL_SCANCODE_2,
+	SDL_SCANCODE_3,
+	SDL_SCANCODE_Q,
+	SDL_SCANCODE_W,
+	SDL_SCANCODE_E,
+	SDL_SCANCODE_A,
+	SDL_SCANCODE_S,
+	SDL_SCANCODE_D,
+	SDL_SCANCODE_Z,
+	SDL_SCANCODE_C,
+	SDL_SCANCODE_4,
+	SDL_SCANCODE_R,
+	SDL_SCANCODE_F,
+	SDL_SCANCODE_V
 };
 
 //Defino estructura del chip-8
@@ -65,7 +69,21 @@ typedef struct machine_t {
 
     char screen[CHIP8_WIDTH*CHIP8_HEIGHT];
     uint8_t keyboard[NUM_KEYS];
+
+    int waitKey;
 } Chip8;
+
+static int isKeyDown(uint8_t key){
+	const Uint8* sdl_keys = SDL_GetKeyboardState(NULL);
+	printf("%s\n",sdl_keys);
+	return sdl_keys[keymap[key]];
+}
+
+// Variables globales de SDL
+SDL_Window* window;
+SDL_Renderer* renderer;
+SDL_Texture* texture;
+SDL_Surface* surface;
 
 static void expansion(char* from, Uint32* to){
 	for(int i=0; i<2048; i++){
@@ -74,7 +92,7 @@ static void expansion(char* from, Uint32* to){
 }
 
 void init_machine(Chip8* machine);
-void load_rom(Chip8* machine);
+void load_rom(char* path, Chip8* machine);
 int decode();
 void draw(Chip8* cpu);
 
@@ -91,18 +109,22 @@ void init_machine(Chip8* machine){
 		machine->stack[i] = 0x00;
 		machine->V[i] = 0x00;
 	}
-        for(int i = 0; i < 80; i++){
-          machine-> mem[i] = fontset[i];
-        }
+    for(int i = 0; i < 80; i++){
+    	machine->mem[i] = fontset[i];
+    }
 
     for(int i = 0; i < 2048; i++){
-          machine-> screen[i] = 0;
-        }
+        machine->screen[i] = 0;
+    }
+
+    for(int i= 0; i<NUM_KEYS; i++){
+    	machine->keyboard[i] = 0;
+    }
 }
 
 // Lectura de ROMs
-void load_rom(Chip8* machine){
-	FILE* fp = fopen("PONG", "r");
+void load_rom(char* path, Chip8* machine){
+	FILE* fp = fopen(path, "r");
 
 	if(fp==NULL){
 		fprintf(stderr, "Cannot open ROM file.\n");
@@ -119,6 +141,12 @@ void load_rom(Chip8* machine){
 }
 
 void clean(){
+	SDL_DestroyTexture(texture);
+
+	SDL_DestroyRenderer(renderer);
+
+	SDL_DestroyWindow(window);
+
 	SDL_Quit();
 }
 
@@ -126,16 +154,17 @@ int lastTicks;
 
 int main(int argc, char** argv){
 
-	SDL_Window* window;
-	SDL_Renderer* renderer;
-	SDL_Texture* texture;
-	SDL_Surface* surface;
+	if(argc < 2){
+		exit(-1);
+	}
+
+	
 
 
 	//CHIP8 configuration
 	Chip8 chip8;
 	init_machine(&chip8);
-	load_rom(&chip8);
+	load_rom(argv[1], &chip8);
 	srand(time(NULL));
 
 
@@ -184,36 +213,43 @@ int main(int argc, char** argv){
         
 
 		while(isRunning){
-			SDL_RenderClear(renderer);
-			SDL_RenderCopy(renderer, texture, NULL, NULL);
-			SDL_RenderPresent(renderer);
+			
 
-			if(chip8.dt>0)
-				chip8.dt-=1;
-			if(chip8.st>0)
-				chip8.st-=1;
-
-			decode(&chip8);
+			
+			//if(!chip8.waitKey)
+				decode(&chip8);
 
 			SDL_Event e;
 			while(SDL_PollEvent(&e)){
 				if(e.type==SDL_QUIT){
 					isRunning = 0;
 				}
+				
 			}
 
-			SDL_LockTexture(texture, NULL, &surface->pixels, &surface->pitch);
-			// memset
-			printf("%d", surface->pitch);
-			//memset(pixels, 0x80, 32 * pitch);
-
-			expansion(chip8.screen, (Uint32*) surface->pixels);
+			
 
 			SDL_UnlockTexture(texture);
 
 			if(SDL_GetTicks() < lastTicks + 1000/FPS){
+				SDL_LockTexture(texture, NULL, &surface->pixels, &surface->pitch);
+				// memset
+				printf("%d", surface->pitch);
+				//memset(pixels, 0x80, 32 * pitch);
+
+				expansion(chip8.screen, (Uint32*) surface->pixels);
+				if(chip8.dt>0)
+					chip8.dt-=1;
+				if(chip8.st>0)
+					chip8.st-=1;
 				SDL_Delay(-SDL_GetTicks()+lastTicks+1000/FPS);
 				//isRunning = 0;
+				SDL_RenderClear(renderer);
+				SDL_RenderCopy(renderer, texture, NULL, NULL);
+				SDL_RenderPresent(renderer);
+				if(SDLK_x){
+					printf("%d",SDLK_x);
+				}
 			}
 			lastTicks = SDL_GetTicks();
 		}
@@ -253,7 +289,7 @@ int decode(Chip8* cpu){
 					// TODO: CLS
 					printf("CLS\n");
                     memset(cpu->screen, 0, sizeof(cpu->screen));
-                                        
+                                   
 				} else if (opcode==0x00EE){
 					// TODO: RET
 					printf("RET\n");
@@ -282,9 +318,8 @@ int decode(Chip8* cpu){
 			case 4:
 				//TODO: SNE
 				printf("SNE %x %x\n", x, kk);
-				if(cpu->V[x]==kk){
-					cpu->pc = (cpu->pc + 2) & 0xFFF;
-				}
+				if(cpu->V[x]!=kk)
+					cpu->pc+=2;
 				break;
 			case 5:
 				printf("SE %x %x\n", x, y);
@@ -320,12 +355,12 @@ int decode(Chip8* cpu){
 						break;
 					case 4:
 						printf("ADD %x %x\n", x, y);
-						cpu->V[0xF] = (cpu->V[x] > cpu->V[x] + cpu->V[y]);
+						cpu->V[0xF] = (cpu->V[x] + cpu->V[y] > 0xFF) ? 1 : 0;
 						cpu->V[x] = (cpu->V[x] + cpu->V[y]) & 0xFF;
 						break;
 					case 5:
 						printf("SUB %x %x\n", x, y);
-						cpu->V[0xF] = (cpu->V[x] > cpu->V[y]);
+						cpu->V[0xF] = (cpu->V[x] < cpu->V[y]);
 						cpu->V[x] = (cpu->V[x] - cpu->V[y]) & 0xFF;
 						break;
 					case 6:
@@ -361,17 +396,22 @@ int decode(Chip8* cpu){
 				break;
 			case 0xC:
 				printf("RND %x %x\n", x, kk);
-				cpu->V[x] = (rand() & 0xFF) & kk;
+				cpu->V[x] = ((rand()%256) & 0xFF) & kk;
+				printf("%x\n",cpu->V[x]);
 				break;
 			case 0xD:
 				printf("DRW %x %x %x\n", x, y, n);
+				cpu->V[0xF] = 0;
 				for(int j=0; j<n; j++){
 					uint8_t sprite = cpu->mem[cpu->i+j];
-					for(int i=0;i<7;i++){
+					for(int i=0;i<8;i++){
 						int px = (cpu->V[x] + i) & 63;
 						int py = (cpu->V[y] + j) & 31;
-						cpu->screen[py*64 + px] = (sprite & (1<<(7-i)))!=0;
-						
+						int pos = py*64 + px;
+						int pixel = (sprite & (1<<(7-i)))!=0;
+
+						cpu->V[15] = (cpu->screen[pos] & pixel);
+						cpu->screen[pos] ^= pixel;
 					}
 					printf("%x\n", sprite);
 				}
@@ -381,10 +421,12 @@ int decode(Chip8* cpu){
 			case 0xE:
 				if(kk==0x9E){
 					printf("SKP %x\n", x);
-
+					if(isKeyDown(cpu->keyboard[cpu->V[x]]))
+						cpu->pc += 2;
 				} else if(kk == 0xA1){
 					printf("SKNP %x\n", x);
-					cpu->pc+=2;
+					if(!isKeyDown(cpu->keyboard[cpu->V[x]]))
+						cpu->pc += 2;
 				}
 				break;
 			case 0xF:
@@ -396,6 +438,19 @@ int decode(Chip8* cpu){
 					case 0x0A:
 						printf("LD %x, K\n", x);
 						//cpu->i = cpu->V[x];
+						int keyflag = 0;
+						cpu->waitKey=1;
+						for(int i = 0; i<NUM_KEYS;i++){
+							if(cpu->keyboard[i]){
+								cpu->V[x] = i;
+								//printf("%x",)
+							}
+						}
+
+						if(!keyflag){
+							printf("Error\n");
+							cpu->pc-=2;
+						}
 						break;
 					case 0x15:
 						printf("LD DT, %x\n", x);
@@ -407,6 +462,7 @@ int decode(Chip8* cpu){
 						break;
 					case 0x1E:
 						printf("ADD I, %x\n", x);
+						cpu->V[0xF] = (cpu->i + cpu->V[x] > 0xFFF) ? 1 : 0;
 						cpu->i = cpu->i + cpu->V[x];
 						break;
 					case 0x29:
@@ -415,19 +471,20 @@ int decode(Chip8* cpu){
 						break;
 					case 0x33:
 						printf("LD B, %x\n", x);
-						cpu->mem[cpu->i] = cpu->V[x]/100;
-						cpu->mem[cpu->i+1] = (cpu->V[x]/10)%10;
-						cpu->mem[cpu->i+2] =(cpu->V[x]%100) %10;
+						cpu->mem[cpu->i] 	= (cpu->V[x]%1000)/100;
+						cpu->mem[cpu->i+1] 	= (cpu->V[x]%100)/10;
+						cpu->mem[cpu->i+2] 	= (cpu->V[x]%10);
 						break;
 					case 0x55:
 						printf("LD [I] %x\n", x);
-						for(int i = 0; i<x;i++){
+						for(int i = 0; i<=x;i++){
 							cpu->mem[cpu->i+i] = cpu->V[i];
 						}
+						cpu->i+=x+1;
 						break;
 					case 0x65:
 						printf("LD %x, [I]\n", x);
-						for(int i = 0; i<x;i++){
+						for(int i = 0; i<=x;i++){
 							cpu->V[i] = cpu->mem[cpu->i+i];
 						}
 						cpu->i+=x+1;
@@ -435,18 +492,5 @@ int decode(Chip8* cpu){
 				}
 				break;
 		}
-
-		//for(int i=0; i<16; i++)
-		//	printf("El registro V%d vale %x\n", i,cpu.V[1]);
-	//}
-
-
-	//printf("%x", cpu.mem[0x200]);
-
 	return 0;
 }
-
-void draw(Chip8* cpu){
-  //SDL_RenderClear(renderer);
-}
-
