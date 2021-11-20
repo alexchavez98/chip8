@@ -3,8 +3,7 @@
 Emulador de CHIP8 en C (todavía en proceso)
 
 ### TO-DO:
-- Arreglar freezeo al inicio
-- Input
+- Arreglar input
 - Sonido
 
 ### Compilación
