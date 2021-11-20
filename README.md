@@ -1,4 +1,4 @@
-# chip8
+# Chip8
 
 Emulador de CHIP8 en C (en proceso)
 
