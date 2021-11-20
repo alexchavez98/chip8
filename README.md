@@ -1,22 +1,22 @@
 # Chip8
 
-Emulador de CHIP8 en C (en proceso)
+CHIP8 emulator written in C (still in progress)
 
 ### TO-DO:
-- Arreglar input
-- Sonido
+- Fix input
+- Add sound
 
-### Compilación
-Es necesario tener instalada la librería SDL2
+### Compile
+SDL2 is required
 
 ```
 gcc -lSDL2 chip-8.c -o ./chip8
 ```
 
 
-### Ejecución
-Ejecutar desde terminal ./chip8 y añadir como parámetro el path de la ROM a ejecutar.
+### Execution
+Execute through terminal ./chip and add ROM path as a parameter to execute:
 
 ```
-./chip8 /path/{ROM A ejecutar}
+./chip8 /path/{ROM}
 ```
