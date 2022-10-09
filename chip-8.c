@@ -10,7 +10,7 @@
 #define CHIP8_HEIGHT  	32
 #define WINDOW_WIDTH  	CHIP8_WIDTH*10
 #define WINDOW_HEIGHT 	CHIP8_HEIGHT*10
-#define FPS				500.0
+#define FPS				100.0
 #define NUM_KEYS		16
 
 // Fonts
@@ -73,9 +73,16 @@ typedef struct machine_t {
     int waitKey;
 } Chip8;
 
+
+
+
+
 static int isKeyDown(uint8_t key){
+	//const Uint8* sdl_keys = SDL_GetKeyboardState(NULL);
+
 	const Uint8* sdl_keys = SDL_GetKeyboardState(NULL);
-	printf("%s\n",sdl_keys);
+	
+	//printf("%s\n y %d\n",(char*)sdl_keys, sdl_keys[keymap[key]]);
 	return sdl_keys[keymap[key]];
 }
 
@@ -84,6 +91,8 @@ SDL_Window* window;
 SDL_Renderer* renderer;
 SDL_Texture* texture;
 SDL_Surface* surface;
+
+
 
 static void expansion(char* from, Uint32* to){
 	for(int i=0; i<2048; i++){
@@ -120,11 +129,12 @@ void init_machine(Chip8* machine){
     for(int i= 0; i<NUM_KEYS; i++){
     	machine->keyboard[i] = 0;
     }
+
 }
 
 // Lectura de ROMs
 void load_rom(char* path, Chip8* machine){
-	FILE* fp = fopen(path, "r");
+	FILE* fp = fopen(path, "rb");
 
 	if(fp==NULL){
 		fprintf(stderr, "Cannot open ROM file.\n");
@@ -154,12 +164,10 @@ int lastTicks;
 
 int main(int argc, char** argv){
 
-	if(argc < 2){
+	if(argc != 2){
+		printf("To start a CHIP8 ROM, enter: ./chip8 /{PATH_TO_ROM}/{ROM_NAME}");
 		exit(-1);
 	}
-
-	
-
 
 	//CHIP8 configuration
 	Chip8 chip8;
@@ -201,7 +209,7 @@ int main(int argc, char** argv){
 		Uint32* pixels;
 		//SDL_LockTexture(texture, NULL, &surface->pixels, &surface->pitch);
 		// memset
-		printf("%d", surface->pitch);
+
 		//memset(pixels, 0x80, 32 * pitch);
 
 		//expansion(chip8.screen, (Uint32*) surface->pixels);
@@ -210,31 +218,27 @@ int main(int argc, char** argv){
 
 		int isRunning=1;
 
-        
-
 		while(isRunning){
 			
+			//if(!chip8.waitKey)	
 
-			
-			//if(!chip8.waitKey)
-				decode(&chip8);
-
+			decode(&chip8);
 			SDL_Event e;
 			while(SDL_PollEvent(&e)){
 				if(e.type==SDL_QUIT){
 					isRunning = 0;
-				}
-				
+				}				
 			}
 
-			
+			SDL_PumpEvents();
 
-			
+
+			SDL_LockTexture(texture, NULL, &surface->pixels, &surface->pitch);
 
 			if(SDL_GetTicks() < lastTicks + 1000/FPS){
 				
 				// memset
-				printf("%d", surface->pitch);
+				//printf("%d", surface->pitch);
 				//memset(pixels, 0x80, 32 * pitch);
 				SDL_UnlockTexture(texture);
 
@@ -248,10 +252,6 @@ int main(int argc, char** argv){
 				SDL_RenderClear(renderer);
 				SDL_RenderCopy(renderer, texture, NULL, NULL);
 				SDL_RenderPresent(renderer);
-				SDL_LockTexture(texture, NULL, &surface->pixels, &surface->pitch);
-				if(SDLK_x){
-					printf("%d",SDLK_x);
-				}
 			}
 			lastTicks = SDL_GetTicks();
 		}
@@ -284,6 +284,7 @@ int decode(Chip8* cpu){
 		uint8_t x = (opcode >> 8) & 0xF;
 		uint8_t y = (opcode >> 4) & 0xF;
 		uint8_t p = (opcode >> 12);
+		//printf("%x\n",p);
 
 		switch(p) {
 			case 0:
@@ -294,115 +295,119 @@ int decode(Chip8* cpu){
                                    
 				} else if (opcode==0x00EE){
 					// TODO: RET
-					printf("RET\n");
-					cpu->sp =(cpu->sp-1) & 0xFFFF;
-					cpu->pc = cpu->stack[cpu->sp];
+					printf("RET q2\n");
+					/*cpu->pc = cpu->stack[cpu->sp];
+					cpu->sp =(cpu->sp-1) & 0xFFFF;*/
+
+					if (cpu->sp > 0)
+                    cpu->pc = cpu->stack[--cpu->sp];
 				}
 				break;
 			case 1:
 				// TODO: JP
-				printf("JP %x\n", nnn);
+				printf("JP %x q3\n", nnn);
 				cpu->pc = nnn;
 				break;
 			case 2:
 				// TODO: CALL
-				printf("CALL %x\n", nnn);
-				cpu->stack[cpu->sp++] = (cpu->pc);
+				printf("CALL %x q4\n", nnn);
+				if(cpu->sp<16)
+					cpu->stack[cpu->sp++] = (cpu->pc);
 				cpu->pc = nnn;
 				break;
 			case 3:
 				// TODO: SE
-				printf("SE %x %x\n", x, kk);
+				printf("SE %x %x q5\n", x, kk);
 				if(cpu->V[x]==kk){
 					cpu->pc = (cpu->pc + 2) & 0xFFF;
 				}
 				break;
 			case 4:
 				//TODO: SNE
-				printf("SNE %x %x\n", x, kk);
+				printf("SNE %x %x q6\n", x, kk);
 				if(cpu->V[x]!=kk)
 					cpu->pc+=2;
 				break;
 			case 5:
-				printf("SE %x %x\n", x, y);
+				printf("SE %x %x q7\n", x, y);
 				if(cpu->V[x]==cpu->V[y]){
 					cpu->pc = (cpu->pc + 2) & 0xFFF;
 				}
 				break;
 			case 6:
-				printf("LD V[%x] %x\n", x, kk);
+				printf("LD V[%x] %x q8\n", x, kk);
 				cpu->V[x] = kk;
 				break;
 			case 7:
-				printf("ADD %x %x\n", x, kk);
+				printf("ADD %x %x q9\n", x, kk);
 				cpu->V[x] = (cpu->V[x] + kk) & 0xFF;
 				break;
 			case 8:
 				switch(n){
 					case 0:
-						printf("LD V%x V%x\n", x, y);
+						printf("LD V%x V%x q10\n", x, y);
 						cpu->V[x] = cpu->V[y];
 						break;
 					case 1:
-						printf("OR %x %x\n", x, y);
+						printf("OR %x %x q11\n", x, y);
 						cpu->V[x] |= cpu->V[y];
 						break;
 					case 2:
-						printf("AND %x %x\n", x, y);
+						printf("AND %x %x q12\n", x, y);
 						cpu->V[x] &= cpu->V[y];
 						break;
 					case 3:
-						printf("XOR %x %x\n", x, y);
+						printf("XOR %x %x q13\n", x, y);
 						cpu->V[x] ^= cpu->V[y];
 						break;
 					case 4:
-						printf("ADD %x %x\n", x, y);
-						cpu->V[0xF] = (cpu->V[x] + cpu->V[y] > 0xFF) ? 1 : 0;
+						printf("ADD %x %x q14\n", x, y);
+						cpu->V[0xF] = (cpu->V[x] > cpu->V[x] + cpu->V[y]);
 						cpu->V[x] = (cpu->V[x] + cpu->V[y]) & 0xFF;
 						break;
 					case 5:
-						printf("SUB %x %x\n", x, y);
-						cpu->V[0xF] = (cpu->V[x] < cpu->V[y]);
+						printf("SUB %x %x q15\n", x, y);
+						cpu->V[0xF] = (cpu->V[x] > cpu->V[y]);
 						cpu->V[x] = (cpu->V[x] - cpu->V[y]) & 0xFF;
 						break;
 					case 6:
-						printf("SHR %x %x\n", x, y);
+						printf("SHR %x %x q16\n", x, y);
 						cpu->V[0xF] = (cpu->V[x] & 0x01);
 						cpu->V[x] = cpu->V[x] >> 1;
 						break;
 					case 7:
-						printf("SUBN %x %x\n", x, y);
+						printf("SUBN %x %x q17\n", x, y);
 						cpu->V[0xF] = (cpu->V[x] < cpu->V[y]);
 						cpu->V[x] = (cpu->V[y] - cpu->V[x]) & 0xFF;
 						break;
 					case 0xE:
-						printf("SHL %x %x\n", x, y);
+						printf("SHL %x %x q18\n", x, y);
 						cpu->V[0xF] = (cpu->V[x] & 0x80) != 0;
 						cpu->V[x] = (cpu->V[x] << 1) & 0xFF;
 						break;
 				}
 				break;
 			case 9:
-				printf("SNE %x %x\n", x, y);
+				printf("SNE %x %x q19\n", x, y);
 				if(cpu->V[x]!=cpu->V[y]){
 					cpu->pc = (cpu->pc+2) & 0xFFF;
 				}
 				break;
 			case 0xA:
-				printf("LD %x\n", nnn);
+				printf("LD %x q20\n", nnn);
 				cpu->i = nnn & 0xFFF;
 				break;
 			case 0xB:
-				printf("JP %x\n", nnn);
+				printf("JP %x q21\n", nnn);
 				cpu->pc = (nnn + cpu->V[0]) & 0xFFF;
 				break;
 			case 0xC:
-				printf("RND %x %x\n", x, kk);
+				printf("RND %x %x q22\n", x, kk);
 				cpu->V[x] = ((rand()%256) & 0xFF) & kk;
 				printf("%x\n",cpu->V[x]);
 				break;
 			case 0xD:
-				printf("DRW %x %x %x\n", x, y, n);
+				printf("DRW %x %x %x q23\n", x, y, n);
 				cpu->V[0xF] = 0;
 				for(int j=0; j<n; j++){
 					uint8_t sprite = cpu->mem[cpu->i+j];
@@ -415,33 +420,38 @@ int decode(Chip8* cpu){
 						cpu->V[15] = (cpu->screen[pos] & pixel);
 						cpu->screen[pos] ^= pixel;
 					}
-					printf("%x\n", sprite);
+					//printf("%x\n", sprite);
 				}
 				
-				printf("%x\n",cpu->V[0xA]);
+				//printf("%x\n",cpu->V[0xA]);
 				break;
 			case 0xE:
 				if(kk==0x9E){
-					printf("SKP %x\n", x);
-					if(isKeyDown(cpu->keyboard[cpu->V[x]]))
-						cpu->pc += 2;
+					printf("SKP %x q24\n", x);
+					if(isKeyDown(cpu->V[x]))
+						cpu->pc = (cpu->pc+2) & 0xFFF;
 				} else if(kk == 0xA1){
 					printf("SKNP %x\n", x);
-					if(!isKeyDown(cpu->keyboard[cpu->V[x]]))
-						cpu->pc += 2;
+					if(!isKeyDown(cpu->V[x])){
+						cpu->pc = (cpu->pc+=2) & 0xFFF;
+						printf("Avanzamos\n");
+					}
+					else{
+						printf("Pressed: %d\n", cpu->V[x]);
+					}
 				}
 				break;
 			case 0xF:
 				switch(kk){
 					case 0x07:
-						printf("LD %x, DT\n", x);
+						printf("LD %x, DT q26\n", x);
 						cpu->V[x] = cpu->dt;
 						break;
 					case 0x0A:
-						printf("LD %x, K\n", x);
+						printf("LD %x, K q27\n", x);
 						//cpu->i = cpu->V[x];
 						int keyflag = 0;
-						cpu->waitKey=1;
+						cpu->waitKey=x;
 						for(int i = 0; i<NUM_KEYS;i++){
 							if(cpu->keyboard[i]){
 								cpu->V[x] = i;
@@ -455,41 +465,45 @@ int decode(Chip8* cpu){
 						}
 						break;
 					case 0x15:
-						printf("LD DT, %x\n", x);
+						printf("LD DT, %x q28\n", x);
 						cpu->dt = cpu->V[x];
 						break;
 					case 0x18:
-						printf("LD ST, %x\n", x);
+						printf("LD ST, %x q29\n", x);
 						cpu->st = cpu->V[x];
 						break;
 					case 0x1E:
-						printf("ADD I, %x\n", x);
+						printf("ADD I, %x q30\n", x);
 						cpu->V[0xF] = (cpu->i + cpu->V[x] > 0xFFF) ? 1 : 0;
 						cpu->i = cpu->i + cpu->V[x];
 						break;
 					case 0x29:
-						printf("LD F, %x\n", x);
+						printf("LD F, %x q31\n", x);
 						cpu->i=(cpu->V[x]&0xF)*0x5;
 						break;
 					case 0x33:
-						printf("LD B, %x\n", x);
-						cpu->mem[cpu->i] 	= (cpu->V[x]%1000)/100;
+						printf("LD B, %x q32\n", x);
+						/*cpu->mem[cpu->i] 	= (cpu->V[x]%1000)/100;
 						cpu->mem[cpu->i+1] 	= (cpu->V[x]%100)/10;
-						cpu->mem[cpu->i+2] 	= (cpu->V[x]%10);
+						cpu->mem[cpu->i+2] 	= (cpu->V[x]%10);*/
+
+						cpu->mem[cpu->i + 2] = cpu->V[x] % 10;
+                    	cpu->mem[cpu->i + 1] = (cpu->V[x] / 10) % 10;
+                   	 	cpu->mem[cpu->i] = (cpu->V[x] / 100);
 						break;
 					case 0x55:
-						printf("LD [I] %x\n", x);
+						printf("LD [I] %x q33\n", x);
 						for(int i = 0; i<=x;i++){
 							cpu->mem[cpu->i+i] = cpu->V[i];
 						}
-						cpu->i+=x+1;
+						//cpu->i+=x+1;
 						break;
 					case 0x65:
-						printf("LD %x, [I]\n", x);
+						printf("LD %x, [I] q34\n", x);
 						for(int i = 0; i<=x;i++){
 							cpu->V[i] = cpu->mem[cpu->i+i];
 						}
-						cpu->i+=x+1;
+						//cpu->i+=x+1;
 						break;
 				}
 				break;
