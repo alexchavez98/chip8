@@ -3,7 +3,6 @@
 CHIP8 emulator written in C (still in progress)
 
 ### TO-DO:
-- Fix input
 - Add sound
 
 ### Compile
