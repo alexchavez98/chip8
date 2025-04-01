@@ -1,23 +1,30 @@
-# Chip8
+# 🎮 CHIP-8 Emulator
 
-CHIP8 emulator written in C (still in progress)
+A CHIP-8 emulator written in **C** using **SDL2**, capable of running classic ROMs from the 1970s and 1980s. This is a personal project to learn more about virtual machines, low-level emulation, and graphics rendering.
 
-### TO-DO:
-- Add sound
+> ⚠️ Project still in progress – sound support is not yet implemented.
 
-### Compile
-SDL2 is required
+---
 
-```
-gcc -lSDL2 chip-8.c -o ./chip8
-```
+## 🧠 What is CHIP-8?
 
+CHIP-8 is a simple, interpreted programming language developed in the 1970s to allow games to be programmed on early computers. It has:
 
-### Execution
-Execute through terminal ./chip and add ROM path as a parameter to execute:
+- 4KB memory
+- 16 8-bit registers
+- A monochrome 64x32 display
+- A 16-key hexadecimal keypad
+- Stack-based subroutines
 
-```
-./chip8 /path/{ROM}
-```
-<img width="752" alt="image" src="https://user-images.githubusercontent.com/57499787/188602408-1bf0a6ae-d0ee-4203-8f13-10c1c054fe79.png">
-<img width="752" alt="image" src="https://user-images.githubusercontent.com/57499787/188602693-71eb2123-d8bd-4eac-8490-f54c2f7694d5.png">
+Perfect for building your own emulator!
+
+---
+
+## 🛠️ Requirements
+
+- **SDL2** (for graphics and input)
+
+### ✅ Install SDL2 (Ubuntu/Debian)
+
+```bash
+sudo apt-get install libsdl2-dev
